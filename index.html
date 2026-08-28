@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Glasses Video Poker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(180deg, #001a33 0%, #003d66 40%, #001a33 100%);
+            font-family: 'Arial Black', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: 
+                radial-gradient(ellipse at center top, rgba(100, 200, 255, 0.1) 0%, transparent 50%),
+                linear-gradient(180deg, #001a33 0%, #003d66 40%, #001a33 100%);
+        }
+
+        /* Header with title and credits */
+        .header {
+            padding: 8px 15px;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.6) 100%);
+            border-bottom: 3px solid #FFD700;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 16px;
+            color: #FFD700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 2px;
+            margin-bottom: 3px;
+        }
+
+        .credits-display {
+            font-size: 22px;
+            color: #00FF00;
+            text-shadow: 0 0 10px #00FF00, 0 0 20px #00FF00;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .credits-label {
+            font-size: 10px;
+            color: #FFD700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Main game area */
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Hands container - 5 hands layout */
+        .hands-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            flex: 1;
+            margin-bottom: 10px;
+        }
+
+        .hand {
+            background: linear-gradient(180deg, rgba(0, 30, 60, 0.8) 0%, rgba(0, 20, 40, 0.9) 100%);
+            border: 3px solid #FFD700;
+            padding: 8px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 
+                0 0 20px rgba(255, 215, 0, 0.3),
+                inset 0 1px 3px rgba(255, 255, 255, 0.1),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .hand.main {
+            grid-column: 1 / -1;
+            flex-direction: row;
+            justify-content: center;
+            border-color: #00FF00;
+            box-shadow: 
+                0 0 25px rgba(0, 255, 0, 0.4),
+                inset 0 1px 3px rgba(255, 255, 255, 0.1),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .hand.winning {
+            border-color: #FF0000;
+            box-shadow: 
+                0 0 30px rgba(255, 0, 0, 0.6),
+                inset 0 1px 3px rgba(255, 255, 255, 0.1),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+            animation: winningPulse 0.5s ease-in-out 2;
+        }
+
+        @keyframes winningPulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255, 0, 0, 0.6), inset 0 1px 3px rgba(255, 255, 255, 0.1), inset 0 -2px 5px rgba(0, 0, 0, 0.5); }
+            50% { box-shadow: 0 0 50px rgba(255, 0, 0, 1), inset 0 1px 3px rgba(255, 255, 255, 0.1), inset 0 -2px 5px rgba(0, 0, 0, 0.5); }
+        }
+
+        .hand-label {
+            font-size: 11px;
+            color: #FFD700;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Card styles */
+        .cards {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            width: 50px;
+            height: 70px;
+            background: linear-gradient(135deg, #1a3a5e 0%, #0f2340 50%, #08152a 100%);
+            border: 2px solid #FFD700;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 
+                inset 0 1px 3px rgba(255, 255, 255, 0.2),
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 215, 0, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .card.highlighted {
+            border: 3px solid #00FFFF;
+            box-shadow: 
+                0 0 20px #00FFFF,
+                inset 0 1px 3px rgba(255, 255, 255, 0.2),
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                0 0 0 2px rgba(0, 255, 255, 0.5);
+            transform: translateY(-8px) scale(1.08);
+        }
+
+        .card.held {
+            border-color: #00FF00;
+            background: linear-gradient(135deg, #1a5e2e 0%, #0f4020 50%, #082a15 100%);
+            box-shadow: 
+                0 0 15px rgba(0, 255, 0, 0.4),
+                inset 0 1px 3px rgba(255, 255, 255, 0.2),
+                0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .card.held::after {
+            content: "HOLD";
+            position: absolute;
+            font-size: 9px;
+            color: #00FF00;
+            font-weight: bold;
+            bottom: 3px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .card.dealing {
+            animation: cardFlip 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes cardFlip {
+            0% {
+                transform: rotateY(90deg) rotateZ(10deg) scale(0.8);
+                opacity: 0;
+            }
+            60% {
+                transform: rotateY(-10deg) rotateZ(-5deg) scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: rotateY(0deg) rotateZ(0deg) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .card-value {
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 1px;
+        }
+
+        /* Results display */
+        .results-display {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 40, 60, 0.95) 100%);
+            border: 4px solid #FFD700;
+            padding: 25px;
+            border-radius: 10px;
+            z-index: 1000;
+            text-align: center;
+            min-width: 220px;
+            max-width: 280px;
+            box-shadow: 
+                0 0 40px rgba(255, 215, 0, 0.5),
+                0 10px 30px rgba(0, 0, 0, 0.8);
+            animation: resultsPop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes resultsPop {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5) rotate(5deg);
+                opacity: 0;
+            }
+            60% {
+                transform: translate(-50%, -50%) scale(1.08) rotate(-2deg);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .results-display.show {
+            display: block;
+        }
+
+        .results-display h2 {
+            color: #00FF00;
+            margin-bottom: 15px;
+            font-size: 26px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 2px;
+            animation: glow 0.6s ease-in-out;
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px #00FF00; }
+            50% { text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 20px #00FF00; }
+        }
+
+        .winning-hands-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 15px;
+            font-size: 11px;
+            text-align: left;
+        }
+
+        .winning-hand-item {
+            background: linear-gradient(90deg, rgba(0, 255, 0, 0.15) 0%, rgba(0, 255, 0, 0.05) 100%);
+            padding: 6px 10px;
+            border-left: 4px solid #00FF00;
+            display: grid;
+            grid-template-columns: 1fr 30px 50px;
+            gap: 8px;
+            align-items: center;
+            box-shadow: inset 1px 0 0 rgba(0, 255, 0, 0.3);
+        }
+
+        .hand-name {
+            color: #FFD700;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .hand-count {
+            color: #00FFFF;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .hand-payout {
+            color: #00FF00;
+            font-weight: bold;
+            text-align: right;
+            text-shadow: 0 0 5px #00FF00;
+        }
+
+        .total-credits {
+            font-size: 24px;
+            color: #00FF00;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px #00FF00;
+            letter-spacing: 1px;
+        }
+
+        .total-credits-label {
+            font-size: 11px;
+            color: #FFD700;
+            margin-bottom: 8px;
+        }
+
+        /* Buttons area */
+        .buttons-area {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.6) 100%);
+            border-top: 3px solid #FFD700;
+            justify-content: center;
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .bet-info {
+            font-size: 10px;
+            color: #FFD700;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            font-weight: bold;
+            height: 14px;
+            line-height: 14px;
+        }
+
+        .btn {
+            padding: 10px 14px;
+            border: 3px solid #FFD700;
+            background: linear-gradient(180deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            box-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            letter-spacing: 1px;
+            min-width: 75px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(180deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.1) 100%);
+            box-shadow: 
+                0 6px 12px rgba(0, 0, 0, 0.5),
+                inset 0 1px 2px rgba(255, 255, 255, 0.2),
+                0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .btn.highlighted {
+            border: 3px solid #00FFFF;
+            background: linear-gradient(180deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 255, 255, 0.1) 100%);
+            color: #00FFFF;
+            box-shadow: 
+                0 0 20px #00FFFF,
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                inset 0 1px 2px rgba(255, 255, 255, 0.2),
+                0 0 0 2px rgba(0, 255, 255, 0.3);
+            transform: translateY(-3px);
+            text-shadow: 0 0 10px #00FFFF, 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        /* Payouts modal */
+        .payouts-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 40, 60, 0.95) 100%);
+            z-index: 999;
+            flex-direction: column;
+            padding: 15px;
+            overflow-y: auto;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .payouts-modal.show {
+            display: flex;
+        }
+
+        .payouts-modal h2 {
+            color: #00FF00;
+            margin-bottom: 8px;
+            text-align: center;
+            font-size: 20px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 2px;
+        }
+
+        .bet-display {
+            text-align: center;
+            color: #00FFFF;
+            margin-bottom: 10px;
+            font-size: 12px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            font-weight: bold;
+        }
+
+        .payouts-table {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 15px;
+            font-size: 11px;
+        }
+
+        .payout-row {
+            display: grid;
+            grid-template-columns: 1fr 60px;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+            border-left: 3px solid #FFD700;
+            box-shadow: inset 1px 0 0 rgba(255, 215, 0, 0.3);
+        }
+
+        .payout-hand {
+            color: #FFD700;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .payout-amount {
+            color: #00FF00;
+            font-weight: bold;
+            text-align: right;
+            text-shadow: 0 0 5px #00FF00;
+        }
+
+        .return-message {
+            text-align: center;
+            color: #00FFFF;
+            font-size: 10px;
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.1) 0%, rgba(0, 255, 255, 0.05) 100%);
+            padding: 8px;
+            border: 2px solid #00FFFF;
+            border-radius: 3px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            font-weight: bold;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #FFD700 0%, #00FFFF 100%);
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #00FFFF 0%, #FFD700 100%);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>♠ VIDEO POKER ♠</h1>
+            <div>
+                <div class="credits-label">CREDITS</div>
+                <div class="credits-display" id="creditsDisplay">1000</div>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="game-area">
+            <!-- Hands Container -->
+            <div class="hands-container">
+                <!-- Main Hand -->
+                <div class="hand main" id="mainHand">
+                    <div class="cards" id="mainCards"></div>
+                </div>
+
+                <!-- Secondary Hands -->
+                <div class="hand" id="hand2">
+                    <div class="hand-label">HAND 2</div>
+                    <div class="cards" id="hand2Cards"></div>
+                </div>
+
+                <div class="hand" id="hand3">
+                    <div class="hand-label">HAND 3</div>
+                    <div class="cards" id="hand3Cards"></div>
+                </div>
+
+                <div class="hand" id="hand4">
+                    <div class="hand-label">HAND 4</div>
+                    <div class="cards" id="hand4Cards"></div>
+                </div>
+
+                <div class="hand" id="hand5">
+                    <div class="hand-label">HAND 5</div>
+                    <div class="cards" id="hand5Cards"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons Area -->
+        <div class="buttons-area">
+            <div class="button-group">
+                <button class="btn" id="payoutsBtn">PAYOUTS</button>
+            </div>
+            <div class="button-group">
+                <button class="btn" id="betBtn">BET</button>
+                <div class="bet-info">Bet: <span id="betDisplay">1</span></div>
+            </div>
+            <div class="button-group">
+                <button class="btn highlighted" id="dealBtn">DEAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payouts Modal -->
+    <div class="payouts-modal" id="payoutsModal">
+        <h2>♦ PAYOUT TABLE ♦</h2>
+        <div class="bet-display">Current Bet: <span id="currentBetDisplay">1</span> Credits</div>
+        <div class="payouts-table" id="payoutsTable"></div>
+        <div class="return-message">▲ Swipe up to return ▲</div>
+    </div>
+
+    <!-- Results Modal -->
+    <div class="results-display" id="resultsDisplay">
+        <h2>★ WINNER! ★</h2>
+        <div class="total-credits-label">CREDITS WON THIS ROUND</div>
+        <div class="total-credits" id="totalWon">0</div>
+        <div class="winning-hands-list" id="resultsWinningHands"></div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

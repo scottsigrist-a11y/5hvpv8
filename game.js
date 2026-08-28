@@ -1,5 +1,164 @@
-// Video Poker Game Logic for Meta Glasses
+// Video Poker Game - Professional Implementation with Animations & Sound
 // Jack or Better rules with 5-hand display
+
+class AudioManager {
+    constructor() {
+        this.audioContext = null;
+        this.initialized = false;
+        this.initAudioContext();
+    }
+
+    initAudioContext() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.audioContext = new AudioContext();
+            
+            // Resume on first user interaction
+            document.addEventListener('click', () => this.resumeContext());
+            document.addEventListener('touchend', () => this.resumeContext());
+        } catch (e) {
+            console.log('Audio context not available');
+        }
+    }
+
+    resumeContext() {
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+    }
+
+    playCardFlip() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') return;
+
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+
+        // Create whoosh effect
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        // Swoosh up then down
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(150, now);
+        osc1.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+        osc1.frequency.exponentialRampToValueAtTime(200, now + 0.25);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(250, now);
+        osc2.frequency.exponentialRampToValueAtTime(350, now + 0.2);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.02, now + 0.25);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.25);
+        osc2.stop(now + 0.25);
+
+        // Add pop at start
+        const pop = ctx.createOscillator();
+        const popGain = ctx.createGain();
+        pop.connect(popGain);
+        popGain.connect(ctx.destination);
+
+        pop.frequency.value = 100;
+        popGain.gain.setValueAtTime(0.08, now);
+        popGain.gain.exponentialRampToValueAtTime(0, now + 0.05);
+        pop.start(now);
+        pop.stop(now + 0.05);
+    }
+
+    playWinBell() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') return;
+
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+
+        // Bell sound - complex tone
+        for (let i = 0; i < 3; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            const freq = [800, 1200, 1600][i];
+            const delay = i * 0.02;
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + delay);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.7, now + delay + 0.4);
+
+            gain.gain.setValueAtTime(0.12 / (i + 1), now + delay);
+            gain.gain.exponentialRampToValueAtTime(0, now + delay + 0.4);
+
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.4);
+        }
+    }
+
+    playCredit() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') return;
+
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+
+        // Ding sound for each credit
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.value = 700;
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0, now + 0.12);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+    }
+
+    playCreditCountdown(credits) {
+        if (!this.audioContext || credits === 0) return;
+
+        const soundCount = Math.min(credits, 25);
+        for (let i = 0; i < soundCount; i++) {
+            setTimeout(() => this.playCredit(), i * 50);
+        }
+    }
+
+    playButtonPress() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') return;
+
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0, now + 0.08);
+
+        osc.start(now);
+        osc.stop(now + 0.08);
+    }
+}
 
 class VideoPokerGame {
     constructor() {
@@ -7,20 +166,19 @@ class VideoPokerGame {
         this.credits = 1000;
         this.bet = 1;
         this.gameState = 'idle'; // idle, dealing, holding, drawing, results
-        this.hands = [[], [], [], [], []]; // 5 hands
         this.mainHand = [];
         this.held = [false, false, false, false, false];
         this.dealtHands = [[], [], [], []];
-        this.winningHands = [];
+        this.winningHandsData = [];
         this.roundWinnings = 0;
 
         // UI Navigation
-        this.highlightedButton = 'deal'; // deal, bet, payouts, or card index
+        this.highlightedButton = 'deal';
         this.selectedCardIndex = 0;
         this.showingPayouts = false;
 
-        // Audio context
-        this.audioContext = null;
+        // Audio manager
+        this.audio = new AudioManager();
 
         // Payout table for Jack or Better (per credit bet)
         this.payoutTable = {
@@ -39,93 +197,9 @@ class VideoPokerGame {
     }
 
     init() {
-        this.setupAudio();
         this.setupEventListeners();
         this.updateUI();
         this.generatePayoutTable();
-    }
-
-    setupAudio() {
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            console.log('Audio context not available');
-        }
-    }
-
-    playCardFlipSound() {
-        if (!this.audioContext || this.audioContext.state === 'suspended') return;
-
-        const ctx = this.audioContext;
-        const now = ctx.currentTime;
-
-        // Whoosh sound - card flip
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
-
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-
-        osc.start(now);
-        osc.stop(now + 0.1);
-    }
-
-    playBingSound() {
-        if (!this.audioContext || this.audioContext.state === 'suspended') return;
-
-        const ctx = this.audioContext;
-        const now = ctx.currentTime;
-
-        // Bell sound
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.exponentialRampToValueAtTime(600, now + 0.3);
-
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0, now + 0.3);
-
-        osc.start(now);
-        osc.stop(now + 0.3);
-    }
-
-    playCreditSound(credits) {
-        if (!this.audioContext || this.audioContext.state === 'suspended') return;
-
-        const ctx = this.audioContext;
-        const soundCount = Math.min(credits, 20); // Limit sounds
-
-        for (let i = 0; i < soundCount; i++) {
-            setTimeout(() => {
-                const now = ctx.currentTime;
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.type = 'sine';
-                osc.frequency.value = 600 + (i * 20);
-
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.exponentialRampToValueAtTime(0, now + 0.1);
-
-                osc.start(now);
-                osc.stop(now + 0.1);
-            }, i * 100);
-        }
     }
 
     setupEventListeners() {
@@ -137,17 +211,13 @@ class VideoPokerGame {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             }
-        });
+        }, { passive: true });
 
         document.addEventListener('touchend', (e) => {
-            if (!this.showingPayouts) {
-                const touchEndX = e.changedTouches[0].clientX;
-                const touchEndY = e.changedTouches[0].clientY;
-                this.handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
-            } else {
-                this.handlePayoutsSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
-            }
-        });
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            this.handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, { passive: true });
 
         // Button click handlers for testing
         document.getElementById('payoutsBtn').addEventListener('click', () => this.showPayouts());
@@ -158,7 +228,7 @@ class VideoPokerGame {
     handleSwipe(startX, startY, endX, endY) {
         const deltaX = endX - startX;
         const deltaY = endY - startY;
-        const threshold = 50;
+        const threshold = 40;
 
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
             // Horizontal swipe
@@ -177,17 +247,9 @@ class VideoPokerGame {
         }
     }
 
-    handlePayoutsSwipe(startX, startY, endX, endY) {
-        const deltaY = endY - startY;
-        const threshold = 50;
-
-        if (deltaY < -threshold) {
-            // Swiped up - close payouts
-            this.closePayouts();
-        }
-    }
-
     swipeLeft() {
+        if (this.showingPayouts) return;
+
         if (this.gameState === 'idle') {
             this.moveButtonHighlight(-1);
         } else if (this.gameState === 'holding') {
@@ -196,6 +258,8 @@ class VideoPokerGame {
     }
 
     swipeRight() {
+        if (this.showingPayouts) return;
+
         if (this.gameState === 'idle') {
             this.moveButtonHighlight(1);
         } else if (this.gameState === 'holding') {
@@ -204,13 +268,15 @@ class VideoPokerGame {
     }
 
     swipeDown() {
-        if (this.gameState === 'holding') {
-            this.moveToDrawButton();
-        }
+        if (this.showingPayouts || this.gameState !== 'holding') return;
+        this.moveToDrawButton();
     }
 
     swipeUp() {
-        if (this.showingPayouts) return;
+        if (this.showingPayouts) {
+            this.closePayouts();
+            return;
+        }
 
         if (this.gameState === 'idle') {
             if (this.highlightedButton === 'deal') {
@@ -233,21 +299,24 @@ class VideoPokerGame {
         const buttons = ['payouts', 'bet', 'deal'];
         let currentIndex = buttons.indexOf(this.highlightedButton);
 
-        if (currentIndex === -1) currentIndex = 2; // default to deal
+        if (currentIndex === -1) currentIndex = 2;
 
         currentIndex = (currentIndex + direction + buttons.length) % buttons.length;
         this.highlightedButton = buttons[currentIndex];
+        this.audio.playButtonPress();
         this.updateUI();
     }
 
     moveCardSelection(direction) {
         this.selectedCardIndex = (this.selectedCardIndex + direction + 5) % 5;
         this.highlightedButton = this.selectedCardIndex;
+        this.audio.playButtonPress();
         this.updateUI();
     }
 
     moveToDrawButton() {
         this.highlightedButton = 'draw';
+        this.audio.playButtonPress();
         this.updateUI();
     }
 
@@ -257,7 +326,9 @@ class VideoPokerGame {
         let nextIndex = (currentIndex + 1) % bets.length;
 
         this.bet = bets[nextIndex];
+        this.audio.playButtonPress();
         this.updateUI();
+        this.generatePayoutTable();
     }
 
     deal() {
@@ -269,6 +340,7 @@ class VideoPokerGame {
         this.credits -= this.bet;
         this.gameState = 'dealing';
         this.held = [false, false, false, false, false];
+        this.winningHandsData = [];
 
         // Deal main hand
         this.mainHand = this.generateHand();
@@ -278,7 +350,6 @@ class VideoPokerGame {
             this.dealtHands[i] = this.generateHand();
         }
 
-        // Animate dealing
         this.animateDealing();
     }
 
@@ -286,7 +357,8 @@ class VideoPokerGame {
         const deck = this.createDeck();
         const hand = [];
         for (let i = 0; i < 5; i++) {
-            hand.push(deck[Math.floor(Math.random() * deck.length)]);
+            const randomIndex = Math.floor(Math.random() * deck.length);
+            hand.push(deck[randomIndex]);
         }
         return hand;
     }
@@ -305,23 +377,30 @@ class VideoPokerGame {
     }
 
     animateDealing() {
+        this.updateUI();
         let cardIndex = 0;
-        const interval = setInterval(() => {
+        const dealInterval = setInterval(() => {
             if (cardIndex < 5) {
-                this.playCardFlipSound();
+                this.audio.playCardFlip();
+                // Add dealing animation class to cards
+                const mainCards = document.querySelectorAll('#mainCards .card');
+                if (mainCards[cardIndex]) {
+                    mainCards[cardIndex].classList.add('dealing');
+                }
                 cardIndex++;
             } else {
-                clearInterval(interval);
+                clearInterval(dealInterval);
                 this.gameState = 'holding';
                 this.selectedCardIndex = 0;
                 this.highlightedButton = 0;
                 this.updateUI();
             }
-        }, 150);
+        }, 200);
     }
 
     toggleHold(cardIndex) {
         this.held[cardIndex] = !this.held[cardIndex];
+        this.audio.playButtonPress();
         this.updateUI();
     }
 
@@ -329,93 +408,108 @@ class VideoPokerGame {
         this.gameState = 'drawing';
         const deck = this.createDeck();
 
-        // Replace non-held cards in main hand
-        for (let i = 0; i < 5; i++) {
-            if (!this.held[i]) {
-                this.mainHand[i] = deck[Math.floor(Math.random() * deck.length)];
-            }
-        }
-
-        // Replace non-held cards in secondary hands
-        for (let handIdx = 0; handIdx < 4; handIdx++) {
-            for (let i = 0; i < 5; i++) {
-                if (!this.held[i]) {
-                    this.dealtHands[handIdx][i] = deck[Math.floor(Math.random() * deck.length)];
-                }
-            }
-        }
-
-        this.animateDrawing();
-    }
-
-    animateDrawing() {
+        // Animate drawing cards
         let cardIndex = 0;
-        const interval = setInterval(() => {
+        const drawInterval = setInterval(() => {
             if (cardIndex < 5) {
                 if (!this.held[cardIndex]) {
-                    this.playCardFlipSound();
+                    this.mainHand[cardIndex] = deck[Math.floor(Math.random() * deck.length)];
+                    this.audio.playCardFlip();
+
+                    // Replace in secondary hands
+                    for (let handIdx = 0; handIdx < 4; handIdx++) {
+                        this.dealtHands[handIdx][cardIndex] = deck[Math.floor(Math.random() * deck.length)];
+                    }
+
+                    // Add animation
+                    const mainCards = document.querySelectorAll('#mainCards .card');
+                    if (mainCards[cardIndex]) {
+                        mainCards[cardIndex].classList.add('dealing');
+                    }
                 }
                 cardIndex++;
+                this.updateUI();
             } else {
-                clearInterval(interval);
-                this.evaluateHands();
+                clearInterval(drawInterval);
+                setTimeout(() => this.evaluateHands(), 300);
             }
-        }, 150);
+        }, 200);
     }
 
     evaluateHands() {
         this.gameState = 'results';
-        this.winningHands = [];
+        this.winningHandsData = [];
         this.roundWinnings = 0;
 
-        // Evaluate main hand
+        // Evaluate all hands
         const mainRank = this.rankHand(this.mainHand);
+        const secondaryRanks = this.dealtHands.map(hand => this.rankHand(hand));
 
-        // Evaluate secondary hands
-        let winningCount = {};
+        // Count winning hands by type
+        const winningCount = {};
 
+        // Check main hand
         if (mainRank.name !== 'High Card') {
-            this.playBingSound();
-            winningCount[mainRank.name] = 1;
-            this.roundWinnings = mainRank.payout * this.bet;
+            if (!winningCount[mainRank.name]) winningCount[mainRank.name] = 0;
+            winningCount[mainRank.name]++;
+            this.roundWinnings += mainRank.payout * this.bet;
         }
 
         // Check secondary hands
-        for (let i = 0; i < 4; i++) {
-            const rank = this.rankHand(this.dealtHands[i]);
+        secondaryRanks.forEach(rank => {
             if (rank.name !== 'High Card') {
-                if (!winningCount[rank.name]) {
-                    winningCount[rank.name] = 0;
-                }
+                if (!winningCount[rank.name]) winningCount[rank.name] = 0;
                 winningCount[rank.name]++;
-                const handWinnings = rank.payout * this.bet;
-                this.roundWinnings += handWinnings;
+                this.roundWinnings += rank.payout * this.bet;
             }
-        }
+        });
 
         // Build winning hands display
-        this.winningHands = [];
         for (let handName in winningCount) {
-            const payout = this.payoutTable[handName] * this.bet * winningCount[handName];
-            this.winningHands.push({
+            const handPayout = this.payoutTable[handName] * this.bet * winningCount[handName];
+            this.winningHandsData.push({
                 name: handName,
                 count: winningCount[handName],
-                payout: payout
+                payout: handPayout
             });
         }
+
+        // Sort by payout descending
+        this.winningHandsData.sort((a, b) => b.payout - a.payout);
 
         // Add credits
         this.credits += this.roundWinnings;
 
-        // Play credit counting sound
+        // Highlight winning hands
         if (this.roundWinnings > 0) {
-            this.playCreditSound(this.roundWinnings);
+            this.audio.playWinBell();
+            this.highlightWinningHands();
+            
+            // Play credit sounds
+            setTimeout(() => {
+                this.audio.playCreditCountdown(this.roundWinnings);
+            }, 400);
         }
 
-        // Show results
+        // Show results after delay
         setTimeout(() => {
             this.showResults();
-        }, 300);
+        }, 1000);
+    }
+
+    highlightWinningHands() {
+        const hands = ['mainHand', 'hand2', 'hand3', 'hand4', 'hand5'];
+        const allRanks = [this.rankHand(this.mainHand), ...this.dealtHands.map(h => this.rankHand(h))];
+
+        allRanks.forEach((rank, idx) => {
+            if (rank.name !== 'High Card') {
+                const handEl = document.getElementById(hands[idx]);
+                if (handEl) {
+                    handEl.classList.add('winning');
+                    setTimeout(() => handEl.classList.remove('winning'), 1200);
+                }
+            }
+        });
     }
 
     rankHand(hand) {
@@ -425,13 +519,9 @@ class VideoPokerGame {
         const values = hand.map(card => rankMap[card[0]]).sort((a, b) => b - a);
         const suits = hand.map(card => suitMap[card[1]]);
 
-        // Check flush
         const isFlush = suits.every(s => s === suits[0]);
-
-        // Check straight
         const isStraight = this.isStraight(values);
 
-        // Check pair patterns
         const counts = {};
         values.forEach(v => counts[v] = (counts[v] || 0) + 1);
         const countArray = Object.values(counts).sort((a, b) => b - a);
@@ -463,7 +553,6 @@ class VideoPokerGame {
     isStraight(values) {
         for (let i = 0; i < 4; i++) {
             if (values[i] - values[i + 1] !== 1) {
-                // Check for A-2-3-4-5 straight
                 if (values[0] === 14 && values[1] === 5 && values[2] === 4 && values[3] === 3 && values[4] === 2) {
                     return true;
                 }
@@ -475,7 +564,7 @@ class VideoPokerGame {
 
     showResults() {
         const modal = document.getElementById('resultsDisplay');
-        const winningsHtml = this.winningHands.map(hand =>
+        const winningsHtml = this.winningHandsData.map(hand =>
             `<div class="winning-hand-item">
                 <div class="hand-name">${hand.name}</div>
                 <div class="hand-count">×${hand.count}</div>
@@ -483,24 +572,23 @@ class VideoPokerGame {
             </div>`
         ).join('');
 
-        document.getElementById('resultsWinningHands').innerHTML = winningsHtml || '<div style="color: #ff0000;">No winning hand this round</div>';
+        document.getElementById('resultsWinningHands').innerHTML = winningsHtml || '<div style="color: #FFD700; padding: 10px; text-align: center;">No winning hand</div>';
         document.getElementById('totalWon').textContent = this.roundWinnings;
         modal.classList.add('show');
 
-        // Return to idle after a delay
+        // Return to idle after delay
         setTimeout(() => {
             modal.classList.remove('show');
             this.gameState = 'idle';
             this.highlightedButton = 'deal';
             this.updateUI();
-        }, 3000);
+        }, 2500);
     }
 
     showPayouts() {
         this.showingPayouts = true;
         const modal = document.getElementById('payoutsModal');
         modal.classList.add('show');
-        this.updatePayoutsDisplay();
     }
 
     closePayouts() {
@@ -512,20 +600,20 @@ class VideoPokerGame {
         const table = document.getElementById('payoutsTable');
         let html = '';
 
-        for (let hand in this.payoutTable) {
+        const handOrder = [
+            'Royal Flush', 'Straight Flush', 'Four of a Kind', 'Full House',
+            'Flush', 'Straight', 'Three of a Kind', 'Two Pair', 'Jacks or Better'
+        ];
+
+        for (let hand of handOrder) {
             const payout = this.payoutTable[hand] * this.bet;
             html += `<div class="payout-row">
                 <div class="payout-hand">${hand}</div>
-                <div class="payout-amount">${payout} Credits</div>
+                <div class="payout-amount">${payout}</div>
             </div>`;
         }
 
         table.innerHTML = html;
-    }
-
-    updatePayoutsDisplay() {
-        document.getElementById('currentBetDisplay').textContent = this.bet;
-        this.generatePayoutTable();
     }
 
     handleDealClick() {
@@ -538,33 +626,26 @@ class VideoPokerGame {
 
     updateUI() {
         // Update credits
-        document.querySelector('.credits-display').textContent = this.credits;
+        document.getElementById('creditsDisplay').textContent = this.credits;
         document.getElementById('betDisplay').textContent = this.bet;
 
         // Update button highlights
-        document.getElementById('dealBtn').classList.toggle('highlighted', this.highlightedButton === 'deal' && this.gameState === 'idle');
-        document.getElementById('dealBtn').classList.toggle('highlighted', this.highlightedButton === 'draw' && this.gameState === 'holding');
+        document.getElementById('dealBtn').classList.toggle('highlighted', 
+            (this.highlightedButton === 'deal' && this.gameState === 'idle') ||
+            (this.highlightedButton === 'draw' && this.gameState === 'holding'));
         document.getElementById('betBtn').classList.toggle('highlighted', this.highlightedButton === 'bet');
         document.getElementById('payoutsBtn').classList.toggle('highlighted', this.highlightedButton === 'payouts');
 
         // Update deal button text
         if (this.gameState === 'holding') {
             document.getElementById('dealBtn').textContent = 'DRAW';
-            if (this.highlightedButton === 'draw') {
-                document.getElementById('dealBtn').classList.add('highlighted');
-            }
         } else {
             document.getElementById('dealBtn').textContent = 'DEAL';
         }
 
-        // Display main hand
+        // Display hands
         this.displayMainHand();
-
-        // Display secondary hands
         this.displaySecondaryHands();
-
-        // Display winning hands list
-        this.displayWinningHandsList();
     }
 
     displayMainHand() {
@@ -576,7 +657,7 @@ class VideoPokerGame {
         this.mainHand.forEach((card, index) => {
             const cardEl = document.createElement('div');
             cardEl.className = 'card';
-            cardEl.textContent = card;
+            cardEl.innerHTML = `<div class="card-value">${card}</div>`;
 
             if (this.gameState === 'holding' && this.highlightedButton === index) {
                 cardEl.classList.add('highlighted');
@@ -599,7 +680,7 @@ class VideoPokerGame {
             this.dealtHands[handIdx].forEach((card, index) => {
                 const cardEl = document.createElement('div');
                 cardEl.className = 'card';
-                cardEl.textContent = card;
+                cardEl.innerHTML = `<div class="card-value">${card}</div>`;
 
                 if (this.held[index]) {
                     cardEl.classList.add('held');
@@ -608,17 +689,6 @@ class VideoPokerGame {
                 container.appendChild(cardEl);
             });
         }
-    }
-
-    displayWinningHandsList() {
-        const container = document.getElementById('winningHandsList');
-        if (this.gameState !== 'holding' || this.winningHands.length === 0) {
-            container.innerHTML = '';
-            return;
-        }
-
-        // Only show if we want to display during gameplay
-        container.innerHTML = '';
     }
 }
 
